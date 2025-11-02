@@ -1,32 +1,114 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Real-Time CI/CD Anomaly Detector</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anomaly Detection Dashboard</title>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background: #f7f9fc;
+      color: #333;
+      text-align: center;
+    }
+    h1 {
+      color: #007bff;
+      margin-bottom: 30px;
+    }
+    canvas {
+      max-width: 700px;
+      margin: 20px auto;
+      background: #fff;
+      border-radius: 10px;
+      padding: 10px;
+      box-shadow: 0px 2px 10px rgba(0,0,0,0.1);
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+  </style>
 </head>
 <body>
-    <h1>Real-Time CI/CD Anomaly Detector</h1>
+  <h1>🚀 CI Anomaly Detector Dashboard</h1>
 
-    <div class="controls">
-        <button onclick="fetchData()">Fetch Build Data</button>
-        <button onclick="detectAnomalies()">Detect Anomalies</button>
-        <button id="toggleBtn" onclick="toggleAutoRefresh()">Start Auto Refresh</button>
-        <span id="statusLabel">⏸️ Auto refresh: OFF</span>
-    </div>
+  <canvas id="dataChart"></canvas>
+  <canvas id="anomalyChart"></canvas>
 
-    <table id="buildTable">
-        <thead>
-            <tr>
-                <th>Build ID</th>
-                <th>Duration (sec)</th>
-                <th>Status</th>
-                <th>Anomaly</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
+  <br>
+  <button onclick="reloadData()">🔄 Refresh Data</button>
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+  <script>
+    async function loadCharts() {
+      // Fetch the build data
+      const dataRes = await fetch('/data');
+      const dataJson = await dataRes.json();
+
+      // Plot build data chart
+      const ctx = document.getElementById('dataChart');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: dataJson.map((_, i) => 'Build ' + (i + 1)),
+          datasets: [{
+            label: 'Build Duration (seconds)',
+            data: dataJson.map(d => d.duration),
+            borderColor: '#007bff',
+            fill: false,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            title: { display: true, text: 'Build Duration Trend' }
+          }
+        }
+      });
+
+      // Fetch anomaly data
+      const anomalyRes = await fetch('/detect');
+      const anomalyJson = await anomalyRes.json();
+
+      // Plot anomaly chart
+      const ctx2 = document.getElementById('anomalyChart');
+      new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: anomalyJson.map((_, i) => 'Anomaly ' + (i + 1)),
+          datasets: [{
+            label: 'Anomaly Scores',
+            data: anomalyJson.map(a => a.score),
+            backgroundColor: '#ff4d4d'
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            title: { display: true, text: 'Detected Anomalies' }
+          }
+        }
+      });
+    }
+
+    function reloadData() {
+      location.reload();
+    }
+
+    loadCharts();
+  </script>
 </body>
 </html>
