@@ -1,128 +1,156 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Anomaly Detection Dashboard</title>
-
-  <!-- Chart.js CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+  <meta charset="utf-8" />
+  <title>Real-Time CI/CD Anomaly Detector</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 40px;
-      background: #f7f9fc;
-      color: #333;
-      text-align: center;
-    }
-    h1 {
-      color: #007bff;
-      margin-bottom: 10px;
-    }
-    p {
-      color: #555;
-    }
-    canvas {
-      max-width: 700px;
-      margin: 20px auto;
-      background: #fff;
-      border-radius: 10px;
-      padding: 10px;
-      box-shadow: 0px 2px 10px rgba(0,0,0,0.1);
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      border: none;
-      border-radius: 5px;
-      background: #007bff;
-      color: white;
-      cursor: pointer;
-      margin-top: 10px;
-    }
-    button:hover {
-      background: #0056b3;
-    }
+    body { font-family: Arial, sans-serif; margin: 20px; background:#f7f9fc; color:#222; }
+    h1 { color:#0a66c2; }
+    .controls { margin: 12px 0; }
+    button { padding:8px 14px; border-radius:6px; border:none; cursor:pointer; background:#0a66c2; color:white; }
+    button.pause { background:#e04b4b; }
+    table { width:100%; border-collapse:collapse; margin-top:12px; background:#fff; }
+    th,td { padding:8px 10px; border:1px solid #ddd; text-align:left; }
+    th { background:#f1f6fb; }
+    .status-fail { color:#e04b4b; font-weight:600; }
+    .ok { color:green; }
   </style>
 </head>
 <body>
-  <h1>🚀 CI Anomaly Detector Dashboard</h1>
-  <p>Auto-refreshes every <b>10 seconds</b> 🔄</p>
+  <h1>Real-Time CI/CD Anomaly Detector</h1>
 
-  <canvas id="dataChart"></canvas>
-  <canvas id="anomalyChart"></canvas>
+  <div class="controls">
+    <button id="fetchBtn">Fetch Build Data</button>
+    <button id="detectBtn">Detect Anomalies</button>
+    <button id="toggleAuto" aria-pressed="false">Start Auto Refresh ▶</button>
+    <span id="autoStatus" style="margin-left:12px;">Auto refresh: <b id="autoState">OFF</b></span>
+  </div>
 
-  <button onclick="reloadData()">Manual Refresh</button>
+  <div id="tableContainer">
+    <table id="buildTable">
+      <thead>
+        <tr><th>Build ID</th><th>Duration (sec)</th><th>Status</th><th>Anomaly</th></tr>
+      </thead>
+      <tbody>
+        <!-- rows will be injected here -->
+      </tbody>
+    </table>
+  </div>
 
   <script>
-    let dataChart, anomalyChart;
+    // state
+    let autoIntervalId = null;
+    const AUTO_MS = 10000; // 10s
 
-    async function loadCharts() {
-      // Fetch build data
-      const dataRes = await fetch('/data');
-      const dataJson = await dataRes.json();
+    // DOM refs
+    const fetchBtn = document.getElementById('fetchBtn');
+    const detectBtn = document.getElementById('detectBtn');
+    const toggleAuto = document.getElementById('toggleAuto');
+    const autoState = document.getElementById('autoState');
+    const tbody = document.querySelector('#buildTable tbody');
 
-      // Fetch anomaly data
-      const anomalyRes = await fetch('/detect');
-      const anomalyJson = await anomalyRes.json();
-
-      // Destroy old charts (if exist)
-      if (dataChart) dataChart.destroy();
-      if (anomalyChart) anomalyChart.destroy();
-
-      // Build data chart
-      const ctx = document.getElementById('dataChart');
-      dataChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: dataJson.map((_, i) => 'Build ' + (i + 1)),
-          datasets: [{
-            label: 'Build Duration (seconds)',
-            data: dataJson.map(d => d.duration),
-            borderColor: '#007bff',
-            fill: false,
-            tension: 0.3
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            title: { display: true, text: 'Build Duration Trend' }
-          }
-        }
-      });
-
-      // Build anomaly chart
-      const ctx2 = document.getElementById('anomalyChart');
-      anomalyChart = new Chart(ctx2, {
-        type: 'bar',
-        data: {
-          labels: anomalyJson.map((_, i) => 'Anomaly ' + (i + 1)),
-          datasets: [{
-            label: 'Anomaly Scores',
-            data: anomalyJson.map(a => a.score),
-            backgroundColor: '#ff4d4d'
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            title: { display: true, text: 'Detected Anomalies' }
-          }
-        }
-      });
+    // safe fetch helper
+    async function safeFetchJson(url) {
+      const res = await fetch(url, {cache: "no-store"});
+      if (!res.ok) throw new Error(`HTTP ${res.status} when fetching ${url}`);
+      return res.json();
     }
 
-    function reloadData() {
-      loadCharts();
+    // render table rows from data
+    function renderTable(builds, anomalies = null) {
+      // if anomalies is an array mapping to builds, use it to mark scores/status
+      tbody.innerHTML = '';
+      for (let i=0; i<builds.length; i++) {
+        const b = builds[i];
+        const tr = document.createElement('tr');
+
+        const buildIdTd = document.createElement('td'); buildIdTd.textContent = b.build_id ?? b.id ?? (101 + i);
+        const durTd     = document.createElement('td'); durTd.textContent = b.duration ?? b.time ?? '';
+        const statusTd  = document.createElement('td'); statusTd.textContent = b.status ?? b.result ?? '';
+        const anomTd    = document.createElement('td');
+
+        // anomaly marker: use anomalies if provided, otherwise default to "✅ Normal"
+        if (Array.isArray(anomalies) && anomalies[i]) {
+          const a = anomalies[i];
+          anomTd.textContent = a.is_anomaly ? `⚠️ ${a.note ?? 'Anomaly'}` : '✅ Normal';
+        } else {
+          anomTd.textContent = '✅ Normal';
+        }
+
+        // style failing builds
+        if ((b.status && b.status.toLowerCase().includes('fail')) || (b.result && b.result.toLowerCase().includes('fail'))) {
+          statusTd.classList.add('status-fail');
+        }
+
+        tr.appendChild(buildIdTd);
+        tr.appendChild(durTd);
+        tr.appendChild(statusTd);
+        tr.appendChild(anomTd);
+        tbody.appendChild(tr);
+      }
     }
 
-    // Auto-refresh every 10 seconds
-    setInterval(loadCharts, 10000);
+    // main fetch-and-render sequence
+    async function fetchAndRender() {
+      try {
+        const builds = await safeFetchJson('/data');
+        // try to fetch anomalies; if it fails, render builds only
+        let anomalies = null;
+        try {
+          anomalies = await safeFetchJson('/detect');
+        } catch (e) {
+          // not fatal — show builds without anomaly scores
+        }
+        renderTable(builds, anomalies);
+      } catch (err) {
+        console.error('Data fetch error:', err);
+        // show error row
+        tbody.innerHTML = '<tr><td colspan="4" style="color:#e04b4b">Error loading data — open devtools console for details</td></tr>';
+      }
+    }
 
-    // Initial load
-    loadCharts();
+    // button handlers
+    fetchBtn.addEventListener('click', fetchAndRender);
+    detectBtn.addEventListener('click', async () => {
+      // run detection and show results (this also updates table via fetchAndRender)
+      try {
+        await safeFetchJson('/detect');        // run detection on server
+        await fetchAndRender();               // refresh table with detection output
+      } catch (err) {
+        console.error('Detect error:', err);
+        alert('Detect failed — see console.');
+      }
+    });
+
+    // toggle auto-refresh: start/stop interval
+    toggleAuto.addEventListener('click', () => {
+      if (autoIntervalId) {
+        // stop
+        clearInterval(autoIntervalId);
+        autoIntervalId = null;
+        toggleAuto.classList.remove('pause');
+        toggleAuto.textContent = 'Start Auto Refresh ▶';
+        toggleAuto.setAttribute('aria-pressed', 'false');
+        autoState.textContent = 'OFF';
+      } else {
+        // start
+        fetchAndRender(); // immediate fetch
+        autoIntervalId = setInterval(fetchAndRender, AUTO_MS);
+        toggleAuto.classList.add('pause');
+        toggleAuto.textContent = 'Pause Auto Refresh ⏸️';
+        toggleAuto.setAttribute('aria-pressed', 'true');
+        autoState.textContent = 'ON';
+      }
+    });
+
+    // initial load once page opens
+    fetchAndRender();
+
+    // cleanup when page unloads
+    window.addEventListener('beforeunload', () => {
+      if (autoIntervalId) clearInterval(autoIntervalId);
+    });
   </script>
 </body>
 </html>
