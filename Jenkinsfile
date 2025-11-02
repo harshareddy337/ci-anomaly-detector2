@@ -8,7 +8,8 @@ pipeline {
     stages {
         stage('Clone Repository') {
             steps {
-                git 'https://github.com/harshareddy337/ci-anomaly-detector2.git'
+                git branch: 'main', url: 'https://github.com/harshareddy337/ci-anomaly-detector2.git'
+
             }
         }
 
