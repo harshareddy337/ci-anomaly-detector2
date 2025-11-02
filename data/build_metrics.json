@@ -1,0 +1,7 @@
+[
+    {"build_id": 101, "duration": 45, "status": "SUCCESS"},
+    {"build_id": 102, "duration": 48, "status": "SUCCESS"},
+    {"build_id": 103, "duration": 50, "status": "SUCCESS"},
+    {"build_id": 104, "duration": 120, "status": "FAILURE"},
+    {"build_id": 105, "duration": 47, "status": "SUCCESS"}
+]

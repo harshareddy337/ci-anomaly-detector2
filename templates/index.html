@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Real-Time CI/CD Anomaly Detector</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Real-Time CI/CD Anomaly Detector</h1>
+
+    <div class="controls">
+        <button onclick="fetchData()">Fetch Build Data</button>
+        <button onclick="detectAnomalies()">Detect Anomalies</button>
+        <button id="toggleBtn" onclick="toggleAutoRefresh()">Start Auto Refresh</button>
+        <span id="statusLabel">⏸️ Auto refresh: OFF</span>
+    </div>
+
+    <table id="buildTable">
+        <thead>
+            <tr>
+                <th>Build ID</th>
+                <th>Duration (sec)</th>
+                <th>Status</th>
+                <th>Anomaly</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
