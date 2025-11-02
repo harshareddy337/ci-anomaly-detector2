@@ -21,14 +21,15 @@ pipeline {
 
         stage('Run Docker Container') {
             steps {
-                // Stop any running container with the same name
+                // Stop and remove old container if it exists
                 bat '''
                 docker ps -q --filter "name=ci-anomaly-detector2-container" > tmp.txt
                 for /f %%i in (tmp.txt) do docker stop %%i
+                for /f %%i in (tmp.txt) do docker rm %%i
                 del tmp.txt
                 '''
 
-                // Run a fresh container
+                // Run fresh container
                 bat 'docker run -d -p 5000:5000 --name ci-anomaly-detector2-container ci-anomaly-detector2'
             }
         }
