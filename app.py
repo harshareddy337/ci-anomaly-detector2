@@ -23,25 +23,20 @@ def get_data():
         builds.append(build)
     return jsonify(builds)
 
-
 @app.route('/detect')
 def detect():
-    # Simply load the current build data and detect anomalies
+    print("🔍 /detect endpoint triggered — running anomaly detection only.")
     try:
         with open('data/build_metrics.json', 'r') as f:
             builds = json.load(f)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    # Call anomaly detector — no new builds created here
     result = detect_anomalies(builds)
-
-    # Return both builds + anomaly results
     return jsonify({
         "builds": builds,
         "anomalies": result
     })
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
