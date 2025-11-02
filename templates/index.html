@@ -18,7 +18,10 @@
     }
     h1 {
       color: #007bff;
-      margin-bottom: 30px;
+      margin-bottom: 10px;
+    }
+    p {
+      color: #555;
     }
     canvas {
       max-width: 700px;
@@ -36,6 +39,7 @@
       background: #007bff;
       color: white;
       cursor: pointer;
+      margin-top: 10px;
     }
     button:hover {
       background: #0056b3;
@@ -44,22 +48,32 @@
 </head>
 <body>
   <h1>🚀 CI Anomaly Detector Dashboard</h1>
+  <p>Auto-refreshes every <b>10 seconds</b> 🔄</p>
 
   <canvas id="dataChart"></canvas>
   <canvas id="anomalyChart"></canvas>
 
-  <br>
-  <button onclick="reloadData()">🔄 Refresh Data</button>
+  <button onclick="reloadData()">Manual Refresh</button>
 
   <script>
+    let dataChart, anomalyChart;
+
     async function loadCharts() {
-      // Fetch the build data
+      // Fetch build data
       const dataRes = await fetch('/data');
       const dataJson = await dataRes.json();
 
-      // Plot build data chart
+      // Fetch anomaly data
+      const anomalyRes = await fetch('/detect');
+      const anomalyJson = await anomalyRes.json();
+
+      // Destroy old charts (if exist)
+      if (dataChart) dataChart.destroy();
+      if (anomalyChart) anomalyChart.destroy();
+
+      // Build data chart
       const ctx = document.getElementById('dataChart');
-      new Chart(ctx, {
+      dataChart = new Chart(ctx, {
         type: 'line',
         data: {
           labels: dataJson.map((_, i) => 'Build ' + (i + 1)),
@@ -79,13 +93,9 @@
         }
       });
 
-      // Fetch anomaly data
-      const anomalyRes = await fetch('/detect');
-      const anomalyJson = await anomalyRes.json();
-
-      // Plot anomaly chart
+      // Build anomaly chart
       const ctx2 = document.getElementById('anomalyChart');
-      new Chart(ctx2, {
+      anomalyChart = new Chart(ctx2, {
         type: 'bar',
         data: {
           labels: anomalyJson.map((_, i) => 'Anomaly ' + (i + 1)),
@@ -105,9 +115,13 @@
     }
 
     function reloadData() {
-      location.reload();
+      loadCharts();
     }
 
+    // Auto-refresh every 10 seconds
+    setInterval(loadCharts, 10000);
+
+    // Initial load
     loadCharts();
   </script>
 </body>
